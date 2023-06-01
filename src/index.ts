@@ -84,11 +84,15 @@ function generateModel(collection: Collection, schema: SchemaOverview): string {
             });
             type = type[0];
         }
+        if(field.nullable) {
+            type = `${type} | null`;
+        }
         source += `
   /**
    * ${field.note || 'No description.'}
    *
    * Type in directus: ${field.type}
+   * Type in database: ${field.dbType}
    */
    ${field.field}: ${type};\n`
     });
