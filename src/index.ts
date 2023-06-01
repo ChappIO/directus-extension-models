@@ -3,7 +3,7 @@ import pluralize from 'pluralize';
 import {mkdir, writeFile} from "node:fs/promises";
 import {join} from "node:path";
 import type {Command} from "commander";
-import type {CollectionsOverview, FieldOverview} from "@directus/shared/types";
+import type {CollectionsOverview, FieldOverview, SchemaOverview} from "@directus/shared/types";
 
 type Collection = CollectionsOverview[''];
 
@@ -19,11 +19,26 @@ function className(collection: Collection): string {
     return upperCamelCase(singular);
 }
 
-function fieldTypeToJsType(field: FieldOverview): string | [string, string] {
+function fieldTypeToJsType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string | string[] {
+    const relation = schema.relations.find(r => r.collection === collection.collection && r.field === field.field);
+    if(relation) {
+        console.log({
+            field,
+            relation,
+        });
+        const targetClassName = className(schema.collections[relation.related_collection]);
+        return [
+            targetClassName,
+            `import { ${targetClassName} } from "./${targetClassName}";`
+        ];
+    }
     switch (field.type) {
         case"boolean":
             return "boolean";
         case "integer":
+        case "float":
+        case "decimal":
+        case "bigInteger":
             return "number";
         case "dateTime":
         case"date":
@@ -38,12 +53,10 @@ function fieldTypeToJsType(field: FieldOverview): string | [string, string] {
             return 'string';
         case "json":
             return "any";
-        case "float":
-        case "decimal":
-        case "bigInteger":
+        case "csv":
+            return "string[]";
         case "alias":
         case "binary":
-        case "csv":
         case "geometry":
         case "geometry.Point":
         case "geometry.LineString":
@@ -57,16 +70,18 @@ function fieldTypeToJsType(field: FieldOverview): string | [string, string] {
     }
 }
 
-function generateModel(collection: Collection): string {
+function generateModel(collection: Collection, schema: SchemaOverview): string {
     let imports = [];
     let source = `export interface ${className(collection)} {\n`;
 
     Object.values(collection.fields).forEach(field => {
-        let type = fieldTypeToJsType(field);
+        let type = fieldTypeToJsType(field, collection, schema);
         if (Array.isArray(type)) {
-            if (!imports.includes(type[1])) {
-                imports.push(type[1]);
-            }
+            type.slice(1).forEach(importLine => {
+                if (!imports.includes(importLine)) {
+                    imports.push(importLine);
+                }
+            });
             type = type[0];
         }
         source += `
@@ -80,7 +95,7 @@ function generateModel(collection: Collection): string {
 
     source += '}\n'
 
-    let importsSource = imports.map(importLine => `${importLine}\n`).join();
+    let importsSource = imports.map(importLine => `${importLine}\n`).join('');
     if (imports) {
         importsSource += "\n";
     }
@@ -94,7 +109,7 @@ function generateIndex(collections: CollectionsOverview): string {
         source += `import { ${className(collection)} } from "./${className(collection)}";\n`
     });
 
-    source += '\nexport interface Collections {';
+    source += '\nexport interface Collections {\n';
     Object.values(collections).forEach((collection: Collection) => {
         source += `  ${collection.collection}: ${className(collection)};\n`
     });
@@ -116,12 +131,11 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
                 const schema = await getSchema();
                 const collections = schema.collections;
 
-                const collectionsService = new services.ItemsService('directus_activity', {
+                const collectionsService = new services.ItemsService('directus_roles', {
                     knex: database,
                     schema
                 });
                 const data = await collectionsService.readByQuery({});
-                console.log(data);
 
                 await mkdir(targetDirectory, {
                     recursive: true,
@@ -130,7 +144,7 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
                 // Generate all classes
                 for (let collection of Object.values(collections)) {
                     const outFile = join(targetDirectory, className(collection) + '.d.ts');
-                    await writeFile(outFile, generateModel(collection))
+                    await writeFile(outFile, generateModel(collection, schema));
                 }
 
                 // Generate the index
