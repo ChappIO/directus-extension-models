@@ -23,3 +23,11 @@ Example:
 ```bash
 directus models snapshot ./src/model
 ```
+
+## Note: Geometry Support
+
+I am still working on support for the geometry types.
+
+## Note: Custom Types Support
+
+I have not added support for custom types. If you would like your custom type to be supported, create an issue.
