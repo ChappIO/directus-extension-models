@@ -1,9 +1,10 @@
 import {defineHook} from '@directus/extensions-sdk';
 import pluralize from 'pluralize';
 import {mkdir, writeFile} from "node:fs/promises";
-import {join} from "node:path";
+import {join, normalize} from "node:path";
 import type {Command} from "commander";
 import type {CollectionsOverview, FieldOverview, SchemaOverview} from "@directus/shared/types";
+import {cwd} from "process";
 
 type Collection = CollectionsOverview[''];
 
@@ -170,12 +171,7 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
             .action(async function (targetDirectory: string) {
                 const schema = await getSchema();
                 const collections = schema.collections;
-
-                const collectionsService = new services.ItemsService('directus_roles', {
-                    knex: database,
-                    schema
-                });
-                const data = await collectionsService.readByQuery({});
+                logger.info(`Exporting models to ${targetDirectory}`);
 
                 await mkdir(targetDirectory, {
                     recursive: true,
