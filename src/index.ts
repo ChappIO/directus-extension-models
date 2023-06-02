@@ -28,16 +28,28 @@ function fieldToRelationType(field: FieldOverview, collection: Collection, schem
     const targetClassName = className(schema.collections[relation.related_collection]);
     const keyType = relation?.schema?.foreign_key_column ?
         // There is a foreign key, so we can use readable names
-        ` | ${targetClassName}["${relation.schema.foreign_key_column}"]` :
+        `${targetClassName}["${relation.schema.foreign_key_column}"]` :
         // No foreign key, so let's just use the field type
-        fieldTypeToJsType(field);
+        fieldTypeToJsType(field, collection);
     return [
         `${targetClassName} | ${keyType}`,
         `import { ${targetClassName} } from "./${targetClassName}";`
     ];
 }
 
-function fieldTypeToJsType(field: FieldOverview): string {
+function aliasToType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string[] | null {
+    const relation = schema.relations.find(r => r?.meta?.one_collection === collection.collection && r?.meta?.one_field);
+    if(!relation) {
+        return null;
+    }
+    const targetClassName = className(schema.collections[relation.meta.many_collection]);
+    return [
+        `${targetClassName}[]`,
+        `import { ${targetClassName} } from "./${targetClassName}";`
+    ];
+}
+
+function fieldTypeToJsType(field: FieldOverview, collection: Collection): string {
     switch (field.type) {
         case"boolean":
             return "boolean";
@@ -72,7 +84,7 @@ function fieldTypeToJsType(field: FieldOverview): string {
         case "geometry.MultiPolygon":
         case "unknown":
         default:
-            return 'unknown';
+            throw new Error('Unknown type');
     }
 }
 
@@ -82,20 +94,34 @@ function generateModel(collection: Collection, schema: SchemaOverview): string {
 
     Object.values(collection.fields).forEach(field => {
         let type: string;
-        let relation = fieldToRelationType(field, collection, schema);
-        if(relation) {
-            type = relation[0];
-            relation.slice(1).forEach(importLine => {
-                if (!imports.includes(importLine)) {
-                    imports.push(importLine);
-                }
-            });
-        } else {
-            // this may just be a plain type
-            type = fieldTypeToJsType(field, collection, schema);
-        }
-        if (field.nullable) {
-            type = `${type} | null`;
+        try {
+            let relation = field.alias ? aliasToType(field, collection, schema) : fieldToRelationType(field, collection, schema);
+            if (relation) {
+                type = relation[0];
+                relation.slice(1).forEach(importLine => {
+                    if (!imports.includes(importLine)) {
+                        imports.push(importLine);
+                    }
+                });
+            } else {
+                // this may just be a plain type
+                type = fieldTypeToJsType(field, collection);
+            }
+            if (field.nullable) {
+                type = `${type} | null`;
+            }
+        } catch (e) {
+            console.error(`
+== Missing Field ==
+Failed to get the type for ${collection.collection}.${field.field}. Setting to "never".
+Please report this error: https://github.com/ChappIO/directus-extension-models/issues.
+
+
+Stack Trace:`, e, `
+
+Model generation will still continue, no worries.
+`);
+            type = 'never';
         }
         source += `
   /**
