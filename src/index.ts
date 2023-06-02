@@ -19,19 +19,25 @@ function className(collection: Collection): string {
     return upperCamelCase(singular);
 }
 
-function fieldTypeToJsType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string | string[] {
+function fieldToRelationType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string[] | null {
     const relation = schema.relations.find(r => r.collection === collection.collection && r.field === field.field);
-    if(relation) {
-        console.log({
-            field,
-            relation,
-        });
-        const targetClassName = className(schema.collections[relation.related_collection]);
-        return [
-            targetClassName,
-            `import { ${targetClassName} } from "./${targetClassName}";`
-        ];
+    if (!relation) {
+        return null;
     }
+
+    const targetClassName = className(schema.collections[relation.related_collection]);
+    const keyType = relation?.schema?.foreign_key_column ?
+        // There is a foreign key, so we can use readable names
+        ` | ${targetClassName}["${relation.schema.foreign_key_column}"]` :
+        // No foreign key, so let's just use the field type
+        fieldTypeToJsType(field);
+    return [
+        `${targetClassName} | ${keyType}`,
+        `import { ${targetClassName} } from "./${targetClassName}";`
+    ];
+}
+
+function fieldTypeToJsType(field: FieldOverview): string {
     switch (field.type) {
         case"boolean":
             return "boolean";
@@ -75,16 +81,20 @@ function generateModel(collection: Collection, schema: SchemaOverview): string {
     let source = `export interface ${className(collection)} {\n`;
 
     Object.values(collection.fields).forEach(field => {
-        let type = fieldTypeToJsType(field, collection, schema);
-        if (Array.isArray(type)) {
-            type.slice(1).forEach(importLine => {
+        let type: string;
+        let relation = fieldToRelationType(field, collection, schema);
+        if(relation) {
+            type = relation[0];
+            relation.slice(1).forEach(importLine => {
                 if (!imports.includes(importLine)) {
                     imports.push(importLine);
                 }
             });
-            type = type[0];
+        } else {
+            // this may just be a plain type
+            type = fieldTypeToJsType(field, collection, schema);
         }
-        if(field.nullable) {
+        if (field.nullable) {
             type = `${type} | null`;
         }
         source += `
@@ -92,7 +102,7 @@ function generateModel(collection: Collection, schema: SchemaOverview): string {
    * ${field.note || 'No description.'}
    *
    * Type in directus: ${field.type}
-   * Type in database: ${field.dbType}
+   * Type in database: ${field.dbType || 'no column'}
    */
    ${field.field}: ${type};\n`
     });
