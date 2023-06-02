@@ -1,10 +1,9 @@
 import {defineHook} from '@directus/extensions-sdk';
 import pluralize from 'pluralize';
 import {mkdir, writeFile} from "node:fs/promises";
-import {join, normalize} from "node:path";
+import {join} from "node:path";
 import type {Command} from "commander";
 import type {CollectionsOverview, FieldOverview, SchemaOverview} from "@directus/shared/types";
-import {cwd} from "process";
 
 type Collection = CollectionsOverview[''];
 
@@ -32,22 +31,35 @@ function fieldToRelationType(field: FieldOverview, collection: Collection, schem
         `${targetClassName}["${relation.schema.foreign_key_column}"]` :
         // No foreign key, so let's just use the field type
         fieldTypeToJsType(field, collection);
-    return [
-        `${targetClassName} | ${keyType}`,
-        `import { ${targetClassName} } from "./${targetClassName}";`
-    ];
+
+    if (targetClassName === className(collection)) {
+        // self reference so no import
+        return [`${targetClassName} | ${keyType}`];
+    } else {
+        // import referenced type
+        return [
+            `${targetClassName} | ${keyType}`,
+            `import { ${targetClassName} } from "./${targetClassName}";`
+        ];
+    }
 }
 
 function aliasToType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string[] | null {
     const relation = schema.relations.find(r => r?.meta?.one_collection === collection.collection && r?.meta?.one_field);
-    if(!relation) {
+    if (!relation) {
         return null;
     }
     const targetClassName = className(schema.collections[relation.meta.many_collection]);
-    return [
-        `${targetClassName}[]`,
-        `import { ${targetClassName} } from "./${targetClassName}";`
-    ];
+    if (targetClassName === className(collection)) {
+        // this is a self-reference, so no self-import needed
+        return [targetClassName];
+    } else {
+        // also add the import
+        return [
+            `${targetClassName}[]`,
+            `import { ${targetClassName} } from "./${targetClassName}";`
+        ];
+    }
 }
 
 function fieldTypeToJsType(field: FieldOverview, collection: Collection): string {
@@ -89,13 +101,19 @@ function fieldTypeToJsType(field: FieldOverview, collection: Collection): string
     }
 }
 
-function generateModel(collection: Collection, schema: SchemaOverview): string {
+async function generateModel(collection: Collection, schema: SchemaOverview, services, database): Promise<string> {
     let imports = [];
     let source = `export interface ${className(collection)} {\n`;
 
-    Object.values(collection.fields).forEach(field => {
+    const fieldsService = new services.ItemsService('directus_fields', {
+        knex: database,
+        schema
+    });
+
+    for (const field of Object.values(collection.fields)) {
         let type: string;
         try {
+            // This might be a relation
             let relation = field.alias ? aliasToType(field, collection, schema) : fieldToRelationType(field, collection, schema);
             if (relation) {
                 type = relation[0];
@@ -105,8 +123,27 @@ function generateModel(collection: Collection, schema: SchemaOverview): string {
                     }
                 });
             } else {
-                // this may just be a plain type
-                type = fieldTypeToJsType(field, collection);
+                // Or this might be an enum
+                const fieldItem = (await fieldsService.readByQuery({
+                    filter: {
+                        collection: {
+                            _eq: collection.collection
+                        },
+                        field: {
+                            _eq: field.field
+                        }
+                    },
+                    limit: 1
+                }))[0];
+                if (fieldItem?.options?.choices?.length) {
+                    // this is an enum with fixed choices!
+                    type = fieldItem?.options?.choices
+                        ?.map(choice => `'${choice.value.replaceAll('\'', '\\\'')}'`)
+                        ?.join(' | ')
+                } else {
+                    // this may just be a plain type
+                    type = fieldTypeToJsType(field, collection);
+                }
             }
             if (field.nullable) {
                 type = `${type} | null`;
@@ -132,7 +169,7 @@ Model generation will still continue, no worries.
    * Type in database: ${field.dbType || 'no column'}
    */
    ${field.field}: ${type};\n`
-    });
+    }
 
     source += '}\n'
 
@@ -180,7 +217,7 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
                 // Generate all classes
                 for (let collection of Object.values(collections)) {
                     const outFile = join(targetDirectory, className(collection) + '.d.ts');
-                    await writeFile(outFile, generateModel(collection, schema));
+                    await writeFile(outFile, await generateModel(collection, schema, services, database));
                 }
 
                 // Generate the index

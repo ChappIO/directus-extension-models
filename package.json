@@ -19,8 +19,8 @@
     "host": "^9.22.4"
   },
   "scripts": {
-    "prepack": "directus-extension build",
-    "dev": "directus-extension build -w --no-minify",
+    "prepack": "directus-extension build --sourcemap",
+    "dev": "directus-extension build -w --no-minify --sourcemap",
     "link": "directus-extension link"
   },
   "devDependencies": {
