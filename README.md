@@ -1,4 +1,4 @@
-# Directus extension: TypeScript Models
+# Directus extension: Generate TypeScript Types Models
 
 This extension lets you generate typescript types from your Schema, allowing you to more easily develop your custom extensions with type checking.
 
