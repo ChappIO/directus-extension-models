@@ -1,7 +1,7 @@
 import {defineHook} from '@directus/extensions-sdk';
 import pluralize from 'pluralize';
 import {mkdir, writeFile} from "node:fs/promises";
-import {join} from "node:path";
+import {dirname} from "node:path";
 import type {Command} from "commander";
 import type {CollectionsOverview, FieldOverview, SchemaOverview} from "@directus/shared/types";
 
@@ -19,7 +19,7 @@ function className(collection: Collection): string {
     return upperCamelCase(singular);
 }
 
-function fieldToRelationType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string[] | null {
+function fieldToRelationType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string | null {
     const relation = schema.relations.find(r => r.collection === collection.collection && r.field === field.field);
     if (!relation) {
         return null;
@@ -32,34 +32,15 @@ function fieldToRelationType(field: FieldOverview, collection: Collection, schem
         // No foreign key, so let's just use the field type
         fieldTypeToJsType(field, collection);
 
-    if (targetClassName === className(collection)) {
-        // self reference so no import
-        return [`${targetClassName} | ${keyType}`];
-    } else {
-        // import referenced type
-        return [
-            `${targetClassName} | ${keyType}`,
-            `import { ${targetClassName} } from "./${targetClassName}";`
-        ];
-    }
+    return `${targetClassName} | ${keyType}`;
 }
 
-function aliasToType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string[] | null {
+function aliasToType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string | null {
     const relation = schema.relations.find(r => r?.meta?.one_collection === collection.collection && r?.meta?.one_field);
     if (!relation) {
         return null;
     }
-    const targetClassName = className(schema.collections[relation.meta.many_collection]);
-    if (targetClassName === className(collection)) {
-        // this is a self-reference, so no self-import needed
-        return [targetClassName];
-    } else {
-        // also add the import
-        return [
-            `${targetClassName}[]`,
-            `import { ${targetClassName} } from "./${targetClassName}";`
-        ];
-    }
+    return className(schema.collections[relation.meta.many_collection]);
 }
 
 function fieldTypeToJsType(field: FieldOverview, collection: Collection): string {
@@ -102,7 +83,6 @@ function fieldTypeToJsType(field: FieldOverview, collection: Collection): string
 }
 
 async function generateModel(collection: Collection, schema: SchemaOverview, services, database): Promise<string> {
-    let imports = [];
     let source = `export interface ${className(collection)} {\n`;
 
     const fieldsService = new services.ItemsService('directus_fields', {
@@ -116,12 +96,7 @@ async function generateModel(collection: Collection, schema: SchemaOverview, ser
             // This might be a relation
             let relation = field.alias ? aliasToType(field, collection, schema) : fieldToRelationType(field, collection, schema);
             if (relation) {
-                type = relation[0];
-                relation.slice(1).forEach(importLine => {
-                    if (!imports.includes(importLine)) {
-                        imports.push(importLine);
-                    }
-                });
+                type = relation;
             } else {
                 // Or this might be an enum
                 const fieldItem = (await fieldsService.readByQuery({
@@ -173,20 +148,11 @@ Model generation will still continue, no worries.
 
     source += '}\n'
 
-    let importsSource = imports.map(importLine => `${importLine}\n`).join('');
-    if (imports) {
-        importsSource += "\n";
-    }
-
-    return `${importsSource}${source}`
+    return source;
 }
 
 function generateIndex(collections: CollectionsOverview): string {
     let source = ``;
-    Object.values(collections).map((collection: Collection) => {
-        source += `import { ${className(collection)} } from "./${className(collection)}";\n`
-    });
-
     source += '\nexport interface Collections {\n';
     Object.values(collections).forEach((collection: Collection) => {
         source += `  ${collection.collection}: ${className(collection)};\n`
@@ -203,25 +169,27 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
 
         modelTypesCommand
             .command('snapshot')
-            .description('Export the currently connected database to .d.ts files into the <directory>')
-            .arguments('<directory>')
-            .action(async function (targetDirectory: string) {
+            .description('Export the currently connected database to .d.ts files into <file>')
+            .arguments('<file>')
+            .action(async function (file: string) {
                 const schema = await getSchema();
                 const collections = schema.collections;
-                logger.info(`Exporting models to ${targetDirectory}`);
+                logger.info(`Exporting models to ${file}`);
 
-                await mkdir(targetDirectory, {
+                await mkdir(dirname(file), {
                     recursive: true,
                 });
 
+                let source = ``;
+
                 // Generate all classes
                 for (let collection of Object.values(collections)) {
-                    const outFile = join(targetDirectory, className(collection) + '.d.ts');
-                    await writeFile(outFile, await generateModel(collection, schema, services, database));
+                    source += await generateModel(collection, schema, services, database) + '\n';
                 }
 
                 // Generate the index
-                await writeFile(join(targetDirectory, 'index.d.ts'), generateIndex(collections));
+                source += generateIndex(collections);
+                await writeFile(file, source);
                 process.exit(0);
             });
     });

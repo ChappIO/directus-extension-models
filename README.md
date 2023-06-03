@@ -16,12 +16,12 @@ or
 yarn add directus-extension-models
 ```
 
-Then, run the `models` command to export your model to disk: `directus models snapshot <targetFolder>`.
+Then, run the `models snapshot` command to export your model to disk: `directus models snapshot <taretFile>`.
 
 Example:
 
 ```bash
-directus models snapshot ./src/model
+directus models snapshot ./src/model.ts
 ```
 
 ## Note: Geometry Support
