@@ -153,7 +153,7 @@ Model generation will still continue, no worries.
 
 function generateIndex(collections: CollectionsOverview): string {
     let source = ``;
-    source += '\nexport interface Collections {\n';
+    source += '\nexport type Collections = {\n';
     Object.values(collections).forEach((collection: Collection) => {
         source += `  ${collection.collection}: ${className(collection)};\n`
     });
