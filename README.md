@@ -21,7 +21,7 @@ Then, run the `models snapshot` command to export your model to disk: `directus 
 Example:
 
 ```bash
-directus models snapshot ./src/model.ts
+directus models snapshot ./path/to/target/model.d.ts
 ```
 
 ## Note: Geometry Support

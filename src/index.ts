@@ -153,9 +153,10 @@ Model generation will still continue, no worries.
 
 function generateIndex(collections: CollectionsOverview): string {
     let source = ``;
+    console.log({collections});
     source += '\nexport type Collections = {\n';
     Object.values(collections).forEach((collection: Collection) => {
-        source += `  ${collection.collection}: ${className(collection)};\n`
+        source += `  ${collection.collection}: ${className(collection)}${collection.singleton ? '' : '[]'};\n`
     });
     source += '}\n';
     return source;
