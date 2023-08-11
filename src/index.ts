@@ -151,12 +151,14 @@ Model generation will still continue, no worries.
     return source;
 }
 
-function generateIndex(collections: CollectionsOverview): string {
+function generateIndex(collections: CollectionsOverview, indexType: 'interface' | 'type'): string {
     let source = ``;
-    console.log({collections});
-    source += '\nexport type Collections = {\n';
+    source += `\nexport ${indexType} Collections${indexType === 'type' ? 'SDK =' : ''} {\n`;
     Object.values(collections).forEach((collection: Collection) => {
-        source += `  ${collection.collection}: ${className(collection)}${collection.singleton ? '' : '[]'};\n`
+        const closingChar = indexType === 'type' ? ',' : ''
+        const collectionDefinition = `${collection.collection}: ${className(collection)}`
+        const singleton = !collection.singleton && indexType === 'interface' ? '[]' : ''
+        source += `  ${collectionDefinition}${singleton}${closingChar}\n`
     });
     source += '}\n';
     return source;
@@ -189,7 +191,8 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
                 }
 
                 // Generate the index
-                source += generateIndex(collections);
+                source += generateIndex(collections, 'interface');
+                source += generateIndex(collections, 'type');
                 await writeFile(file, source);
                 process.exit(0);
             });
