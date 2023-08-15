@@ -115,6 +115,10 @@ async function generateModel(collection: Collection, schema: SchemaOverview, ser
                     type = fieldItem?.options?.choices
                         ?.map(choice => `'${choice.value.replaceAll('\'', '\\\'')}'`)
                         ?.join(' | ')
+                    // add array type in case of multi-selection
+                    if (fieldItem?.interface.includes('multiple')) {
+                        type = `(${type})[]`
+                    }
                 } else {
                     // this may just be a plain type
                     type = fieldTypeToJsType(field, collection);
