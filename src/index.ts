@@ -114,7 +114,12 @@ async function generateModel(collection: Collection, schema: SchemaOverview, ser
                     // this is an enum with fixed choices!
                     type = fieldItem?.options?.choices
                         ?.map(choice => `'${choice.value.replaceAll('\'', '\\\'')}'`)
-                        ?.join(' | ')
+                        ?.join(' | ');
+
+                    // add array type in case of multi-selection
+                    if (fieldItem?.interface?.includes('multiple')) {
+                        type = `(${type})[]`;
+                    }
                 } else {
                     // this may just be a plain type
                     type = fieldTypeToJsType(field, collection);
