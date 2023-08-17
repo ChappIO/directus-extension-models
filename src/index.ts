@@ -114,7 +114,12 @@ async function generateModel(collection: Collection, schema: SchemaOverview, ser
                     // this is an enum with fixed choices!
                     type = fieldItem?.options?.choices
                         ?.map(choice => `'${choice.value.replaceAll('\'', '\\\'')}'`)
-                        ?.join(' | ')
+                        ?.join(' | ');
+
+                    // add array type in case of multi-selection
+                    if (fieldItem?.interface?.includes('multiple')) {
+                        type = `(${type})[]`;
+                    }
                 } else {
                     // this may just be a plain type
                     type = fieldTypeToJsType(field, collection);
@@ -153,7 +158,6 @@ Model generation will still continue, no worries.
 
 function generateIndex(collections: CollectionsOverview): string {
     let source = ``;
-    console.log({collections});
     source += '\nexport type Collections = {\n';
     Object.values(collections).forEach((collection: Collection) => {
         source += `  ${collection.collection}: ${className(collection)}${collection.singleton ? '' : '[]'};\n`
