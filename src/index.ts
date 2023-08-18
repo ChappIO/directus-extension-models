@@ -194,6 +194,13 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
 
                 // Generate the index
                 source += generateIndex(collections);
+
+                source += `
+type ItemType<CollectionKey extends keyof Collections> =
+    Collections[CollectionKey] extends (infer Item)[]
+        ? Item
+        : Collections[CollectionKey];
+`
                 await writeFile(file, source);
                 process.exit(0);
             });
