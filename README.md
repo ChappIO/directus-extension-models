@@ -24,8 +24,8 @@ Example:
 directus models snapshot ./path/to/target/model.d.ts
 ```
 
-> :thumbsup: **Global Types**: You can specify the --global option while taking a snapshot generate a global.d.ts file giving you types without having to import them. 
-> To make this work, you have to export 
+> :thumbsup: **Global Types**: You can specify the --global option while taking a snapshot generate a global.d.ts
+> file giving you types without having to import them.
 
 ### Usage in @directus/sdk
 
