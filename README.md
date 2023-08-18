@@ -51,6 +51,34 @@ const directus = createDirectus<Collections>(
 })();
 ```
 
+### Usage in Directus extensions
+
+```typescript
+import {defineEndpoint} from '@directus/extensions-sdk';
+import type {CollectionName} from "../models";
+import type {ItemsService} from "@directus/api/dist/services";
+import {ItemIn} from "directus-app/models";
+
+export default defineEndpoint((router, {services}) => {
+    /**
+     * You probably want to move this utility to a place more suitable
+     * for your extension
+     */
+    function items<C extends CollectionName>(collectionName: C): ItemsService<ItemIn<C>> {
+        return new services.ItemsService(collectionName);
+    }
+
+    router.get('/', async (_req, res) => {
+        const settings = await items('directus_settings')
+            .readSingleton({});
+
+        res.json({
+            name: settings.project_name
+        });
+    });
+});
+```
+
 ## Note: Geometry Support
 
 I am still working on support for the geometry types.

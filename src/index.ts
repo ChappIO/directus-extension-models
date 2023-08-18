@@ -196,10 +196,14 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
                 source += generateIndex(collections);
 
                 source += `
-type ItemType<CollectionKey extends keyof Collections> =
+
+type CollectionName = keyof Collections;
+
+type ItemIn<CollectionKey extends CollectionName> =
     Collections[CollectionKey] extends (infer Item)[]
-        ? Item
-        : Collections[CollectionKey];
+        ? Exclude<Item, unknown>
+        : Collections[CollectionKey]
+
 `
                 await writeFile(file, source);
                 process.exit(0);
