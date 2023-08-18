@@ -82,8 +82,8 @@ function fieldTypeToJsType(field: FieldOverview, collection: Collection): string
     }
 }
 
-async function generateModel(collection: Collection, schema: SchemaOverview, services, database): Promise<string> {
-    let source = `export interface ${className(collection)} {\n`;
+async function generateModel(collection: Collection, schema: SchemaOverview, services, database, exportKeyword: 'export' | 'declare'): Promise<string> {
+    let source = `${exportKeyword} interface ${className(collection)} {\n`;
 
     const fieldsService = new services.ItemsService('directus_fields', {
         knex: database,
@@ -156,9 +156,11 @@ Model generation will still continue, no worries.
     return source;
 }
 
-function generateIndex(collections: CollectionsOverview): string {
+function generateIndex(collections: CollectionsOverview, exportKeyword: 'declare' | 'export'): string {
     let source = ``;
-    source += '\nexport type Collections = {\n';
+    source += `
+${exportKeyword} type Collections = {
+`;
     Object.values(collections).forEach((collection: Collection) => {
         source += `  ${collection.collection}: ${className(collection)}${collection.singleton ? '' : '[]'};\n`
     });
@@ -176,7 +178,8 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
             .command('snapshot')
             .description('Export the currently connected database to .d.ts files into <file>')
             .arguments('<file>')
-            .action(async function (file: string) {
+            .option('-g, --global', 'Generate a file with global declarations instead of exports. Just snapshot it into your typescript project as a .d.ts file.', false)
+            .action(async function (file: string, opts: any) {
                 const schema = await getSchema();
                 const collections = schema.collections;
                 logger.info(`Exporting models to ${file}`);
@@ -186,14 +189,15 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
                 });
 
                 let source = ``;
+                const exportKeyword = opts.global ? 'declare' : 'export';
 
                 // Generate all classes
                 for (let collection of Object.values(collections)) {
-                    source += await generateModel(collection, schema, services, database) + '\n';
+                    source += await generateModel(collection, schema, services, database, exportKeyword) + '\n';
                 }
 
                 // Generate the index
-                source += generateIndex(collections);
+                source += generateIndex(collections, exportKeyword);
 
                 source += `
 

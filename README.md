@@ -24,6 +24,9 @@ Example:
 directus models snapshot ./path/to/target/model.d.ts
 ```
 
+> :thumbsup: **Global Types**: You can specify the --global option while taking a snapshot generate a global.d.ts file giving you types without having to import them. 
+> To make this work, you have to export 
+
 ### Usage in @directus/sdk
 
 You can now create your directus sdk using these generated models:
@@ -77,11 +80,3 @@ export default defineEndpoint((router, {services}) => {
     });
 });
 ```
-
-## Note: Geometry Support
-
-I am still working on support for the geometry types.
-
-## Note: Custom Types Support
-
-I have not added support for custom types. If you would like your custom type to be supported, create an issue.
