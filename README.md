@@ -55,9 +55,8 @@ const directus = createDirectus<Collections>(
 
 ```typescript
 import {defineEndpoint} from '@directus/extensions-sdk';
-import type {CollectionName} from "../models";
+import type {CollectionName, ItemIn} from "../models";
 import type {ItemsService} from "@directus/api/dist/services";
-import {ItemIn} from "directus-app/models";
 
 export default defineEndpoint((router, {services}) => {
     /**
