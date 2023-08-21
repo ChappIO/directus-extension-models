@@ -1,5 +1,5 @@
 # Directus extension: Generate TypeScript Types Models
-[![directus-extension-models](https://npmbadge.com/npm/directus-extension-models)](https://www.npmjs.com/package/directus-extension-models)
+[![directus-extension-models](https://npmbadge.com/npm/directus-extension-models?mode=yarn)](https://www.npmjs.com/package/directus-extension-models)
 
 This extension lets you generate typescript types from your Schema, allowing you to more easily develop your custom extensions with type checking.
 
