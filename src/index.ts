@@ -201,9 +201,9 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
 
                 source += `
 
-type CollectionName = keyof Collections;
+${exportKeyword} type CollectionName = keyof Collections;
 
-type ItemIn<CollectionKey extends CollectionName> =
+${exportKeyword} type ItemIn<CollectionKey extends CollectionName> =
     Collections[CollectionKey] extends (infer Item)[]
         ? Exclude<Item, unknown>
         : Collections[CollectionKey]
