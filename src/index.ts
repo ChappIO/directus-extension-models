@@ -205,7 +205,7 @@ ${exportKeyword} type CollectionName = keyof Collections;
 
 ${exportKeyword} type ItemIn<CollectionKey extends CollectionName> =
     Collections[CollectionKey] extends (infer Item extends Record<string, any>)[]
-        ? Exclude<Item, unknown>
+        ? Item
         : Collections[CollectionKey]
 
 `
