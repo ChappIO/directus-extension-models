@@ -44,7 +44,6 @@ function aliasToType(field: FieldOverview, collection: Collection, schema: Schem
     return `${className(schema.collections[relation.meta.many_collection])}[]`;
 }
 
-
 function fieldTypeToJsType(field: FieldOverview, collection: Collection): string {
     switch (field.type) {
         case "boolean":
