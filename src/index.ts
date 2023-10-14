@@ -32,11 +32,6 @@ function fieldToRelationType(field: FieldOverview, collection: Collection, schem
         // No foreign key, so let's just use the field type
         fieldTypeToJsType(field, collection);
 
-    // Check for M2M and O2M relations
-    if (relation.m2m_field || relation.o2m_field) {
-        return `${targetClassName}[] | ${keyType}[]`;
-    }
-
     return `${targetClassName} | ${keyType}`;
 }
 
