@@ -1,9 +1,9 @@
-import {defineHook} from '@directus/extensions-sdk';
+import { defineHook } from '@directus/extensions-sdk';
+import type { CollectionsOverview, FieldOverview, SchemaOverview } from "@directus/shared/types";
+import type { Command } from "commander";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import pluralize from 'pluralize';
-import {mkdir, writeFile} from "node:fs/promises";
-import {dirname} from "node:path";
-import type {Command} from "commander";
-import type {CollectionsOverview, FieldOverview, SchemaOverview} from "@directus/shared/types";
 
 type Collection = CollectionsOverview[''];
 
@@ -35,17 +35,18 @@ function fieldToRelationType(field: FieldOverview, collection: Collection, schem
     return `${targetClassName} | ${keyType}`;
 }
 
+
 function aliasToType(field: FieldOverview, collection: Collection, schema: SchemaOverview): string | null {
-    const relation = schema.relations.find(r => r?.meta?.one_collection === collection.collection && r?.meta?.one_field);
+    const relation = schema.relations.find(r => r?.meta?.one_collection === collection.collection && r?.meta?.one_field === field.field);
     if (!relation) {
         return null;
     }
-    return className(schema.collections[relation.meta.many_collection]);
+    return `${className(schema.collections[relation.meta.many_collection])}[]`;
 }
 
 function fieldTypeToJsType(field: FieldOverview, collection: Collection): string {
     switch (field.type) {
-        case"boolean":
+        case "boolean":
             return "boolean";
         case "integer":
         case "float":
@@ -53,7 +54,7 @@ function fieldTypeToJsType(field: FieldOverview, collection: Collection): string
         case "bigInteger":
             return "number";
         case "dateTime":
-        case"date":
+        case "date":
         case "time":
         case "timestamp":
             // TODO: Validate this
@@ -168,8 +169,8 @@ ${exportKeyword} type Collections = {
     return source;
 }
 
-export default defineHook(async ({init}, {services, getSchema, database, logger}) => {
-    init('cli.after', ({program}: any) => {
+export default defineHook(async ({ init }, { services, getSchema, database, logger }) => {
+    init('cli.after', ({ program }: any) => {
 
         const modelTypesCommand: Command = program.command('models')
             .description('Export the currently connected database to .d.ts files');
