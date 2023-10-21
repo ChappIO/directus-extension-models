@@ -83,7 +83,7 @@ function fieldTypeToJsType(field: FieldOverview, collection: Collection): string
     }
 }
 
-async function generateModel(collection: Collection, schema: SchemaOverview, services, database, exportKeyword: 'export' | 'declare'): Promise<string> {
+async function generateModel(collection: Collection, schema: SchemaOverview, services, database, exportKeyword: 'export' | 'declare', sortFields: boolean): Promise<string> {
     let source = `${exportKeyword} interface ${className(collection)} {\n`;
 
     const fieldsService = new services.ItemsService('directus_fields', {
@@ -91,7 +91,8 @@ async function generateModel(collection: Collection, schema: SchemaOverview, ser
         schema
     });
 
-    for (const field of Object.values(collection.fields).sort(byKey('field'))) {
+    const fields = sortFields ? Object.values(collection.fields).sort(byKey('field')) : Object.values(collection.fields);
+    for (const field of fields) {
         let type: string;
         try {
             // This might be a relation
@@ -184,7 +185,7 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
             .description('Export the currently connected database to .d.ts files into <file>')
             .arguments('<file>')
             .option('-g, --global', 'Generate a file with global declarations instead of exports. Just snapshot it into your typescript project as a .d.ts file.', false)
-            .option('--sort <boolean>', 'Set --sort false to disable alphabetic sorting of fields and collection. This defaults to true to make git diffs more consistent.', true)
+            .option('--no-sort', 'Set --no-sort to disable alphabetic sorting of fields and collection. This defaults to sorting to make git diffs more consistent.', true)
             .action(async function (file: string, opts: any) {
                 const schema = await getSchema();
                 const collections = schema.collections;
@@ -200,7 +201,7 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
                 // Generate all classes
                 const sortedCollections = opts.sort ? Object.values(collections).sort(byKey('collection')) : Object.values(collections);
                 for (let collection of sortedCollections) {
-                    source += await generateModel(collection, schema, services, database, exportKeyword) + '\n';
+                    source += await generateModel(collection, schema, services, database, exportKeyword, opts.sort) + '\n';
                 }
 
                 // Generate the index
