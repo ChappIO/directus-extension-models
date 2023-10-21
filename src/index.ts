@@ -1,8 +1,8 @@
-import { defineHook } from '@directus/extensions-sdk';
-import type { CollectionsOverview, FieldOverview, SchemaOverview } from "@directus/shared/types";
-import type { Command } from "commander";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import {defineHook} from '@directus/extensions-sdk';
+import type {CollectionsOverview, FieldOverview, SchemaOverview} from "@directus/shared/types";
+import type {Command} from "commander";
+import {mkdir, writeFile} from "node:fs/promises";
+import {dirname} from "node:path";
 import pluralize from 'pluralize';
 
 type Collection = CollectionsOverview[''];
@@ -24,15 +24,31 @@ function fieldToRelationType(field: FieldOverview, collection: Collection, schem
     if (!relation) {
         return null;
     }
+    if (relation.related_collection) {
+        // This relation references a single target collection
+        const targetClassName = className(schema.collections[relation.related_collection]);
+        const keyType = relation?.schema?.foreign_key_column ?
+            // There is a foreign key, so we can use readable names
+            `${targetClassName}["${relation.schema.foreign_key_column}"]` :
+            // No foreign key, so let's just use the field type
+            fieldTypeToJsType(field, collection);
 
-    const targetClassName = className(schema.collections[relation.related_collection]);
-    const keyType = relation?.schema?.foreign_key_column ?
-        // There is a foreign key, so we can use readable names
-        `${targetClassName}["${relation.schema.foreign_key_column}"]` :
-        // No foreign key, so let's just use the field type
-        fieldTypeToJsType(field, collection);
+        return `${targetClassName} | ${keyType}`;
+    }
 
-    return `${targetClassName} | ${keyType}`;
+    // This relation might reference multiple target collections
+    if(relation.meta.one_allowed_collections?.length) {
+        const relatedCollections = relation.meta.one_allowed_collections;
+        const types = relatedCollections.map(relatedCollectionName => {
+            const relatedCollection = schema.collections[relatedCollectionName];
+            const relatedClassName = className(relatedCollection);
+            const relatedPrimaryKey = relatedCollection.primary;
+            return `${relatedClassName} | ${relatedClassName}["${relatedPrimaryKey}"]`
+        });
+        return types.join(" | ");
+    }
+
+    throw new Error(`Failed to get type for relation ${JSON.stringify(relation)}`);
 }
 
 
@@ -169,8 +185,8 @@ ${exportKeyword} type Collections = {
     return source;
 }
 
-export default defineHook(async ({ init }, { services, getSchema, database, logger }) => {
-    init('cli.after', ({ program }: any) => {
+export default defineHook(async ({init}, {services, getSchema, database, logger}) => {
+    init('cli.after', ({program}: any) => {
 
         const modelTypesCommand: Command = program.command('models')
             .description('Export the currently connected database to .d.ts files');
