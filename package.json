@@ -2,7 +2,7 @@
   "name": "directus-extension-models",
   "description": "Generate .d.ts files from your directus schema",
   "icon": "extension",
-  "version": "2.4.4",
+  "version": "2.5.0",
   "keywords": [
     "directus",
     "directus-extension",

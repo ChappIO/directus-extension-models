@@ -99,7 +99,7 @@ function fieldTypeToJsType(field: FieldOverview, collection: Collection): string
     }
 }
 
-async function generateModel(collection: Collection, schema: SchemaOverview, services, database, exportKeyword: 'export' | 'declare'): Promise<string> {
+async function generateModel(collection: Collection, schema: SchemaOverview, services, database, exportKeyword: 'export' | 'declare', sortFields: boolean): Promise<string> {
     let source = `${exportKeyword} interface ${className(collection)} {\n`;
 
     const fieldsService = new services.ItemsService('directus_fields', {
@@ -107,7 +107,8 @@ async function generateModel(collection: Collection, schema: SchemaOverview, ser
         schema
     });
 
-    for (const field of Object.values(collection.fields)) {
+    const fields = sortFields ? Object.values(collection.fields).sort(byKey('field')) : Object.values(collection.fields);
+    for (const field of fields) {
         let type: string;
         try {
             // This might be a relation
@@ -173,12 +174,16 @@ Model generation will still continue, no worries.
     return source;
 }
 
-function generateIndex(collections: CollectionsOverview, exportKeyword: 'declare' | 'export'): string {
+function byKey<T, K extends keyof T>(key: K) {
+    return (a: T, b: T) => a[key] > b[key] ? 1 : -1;
+}
+
+function generateIndex(collections: Collection[], exportKeyword: 'declare' | 'export'): string {
     let source = ``;
     source += `
 ${exportKeyword} type Collections = {
 `;
-    Object.values(collections).forEach((collection: Collection) => {
+    collections.forEach((collection: Collection) => {
         source += `  ${collection.collection}: ${className(collection)}${collection.singleton ? '' : '[]'};\n`
     });
     source += '}\n';
@@ -196,6 +201,7 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
             .description('Export the currently connected database to .d.ts files into <file>')
             .arguments('<file>')
             .option('-g, --global', 'Generate a file with global declarations instead of exports. Just snapshot it into your typescript project as a .d.ts file.', false)
+            .option('--no-sort', 'Set --no-sort to disable alphabetic sorting of fields and collection. This defaults to sorting to make git diffs more consistent.', true)
             .action(async function (file: string, opts: any) {
                 const schema = await getSchema();
                 const collections = schema.collections;
@@ -209,12 +215,13 @@ export default defineHook(async ({init}, {services, getSchema, database, logger}
                 const exportKeyword = opts.global ? 'declare' : 'export';
 
                 // Generate all classes
-                for (let collection of Object.values(collections)) {
-                    source += await generateModel(collection, schema, services, database, exportKeyword) + '\n';
+                const sortedCollections = opts.sort ? Object.values(collections).sort(byKey('collection')) : Object.values(collections);
+                for (let collection of sortedCollections) {
+                    source += await generateModel(collection, schema, services, database, exportKeyword, opts.sort) + '\n';
                 }
 
                 // Generate the index
-                source += generateIndex(collections, exportKeyword);
+                source += generateIndex(sortedCollections, exportKeyword);
 
                 source += `
 
