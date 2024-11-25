@@ -17,7 +17,7 @@ or
 yarn add directus-extension-models
 ```
 
-Then, run the `models snapshot` command to export your model to disk: `directus models snapshot <taretFile>`.
+Then, run the `models snapshot` command to export your model to disk: `directus models snapshot <targetFile>`.
 
 Example:
 
