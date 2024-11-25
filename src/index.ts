@@ -66,9 +66,10 @@ function fieldTypeToJsType(field: FieldOverview, collection: Collection): string
             return "boolean";
         case "integer":
         case "float":
-        case "decimal":
         case "bigInteger":
             return "number";
+        case "decimal":
+            return "string";
         case "dateTime":
         case "date":
         case "time":
